@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-type logLevel = int
+type logLevel = string
 type logOutput = int
 
 type (
@@ -78,11 +78,11 @@ const (
 
 // LogLevel valid values
 var LogLevel = &LogLevels{
-	None:  0,
-	Debug: 1,
-	Info:  2,
-	Error: 3,
-	All:   4,
+	None:  "none",
+	Debug: "debug",
+	Info:  "info",
+	Error: "error",
+	All:   "all",
 }
 
 var LogOutput = &LogOutputs{
