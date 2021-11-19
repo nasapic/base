@@ -5,6 +5,7 @@ type (
 		Name() string
 		Init() bool  // NOTE: Better return an error?
 		Start() bool // NOTE: Better return an error?
+		Log() Logger
 	}
 )
 
@@ -26,18 +27,22 @@ func NewWorker(name string, log Logger) *BaseWorker {
 	}
 }
 
-func (bw BaseWorker) Name() string {
+func (bw *BaseWorker) Name() string {
 	return bw.name
 }
 
-func (bw BaseWorker) SetName(name string) {
+func (bw *BaseWorker) SetName(name string) {
 	bw.name = name
 }
 
-func (bw BaseWorker) Init() bool {
+func (bw *BaseWorker) Init() bool {
 	return bw.didInit
 }
 
-func (bw BaseWorker) Start() bool {
+func (bw *BaseWorker) Start() bool {
 	return bw.didStart
+}
+
+func (bw *BaseWorker) Log() Logger {
+	return bw.log
 }
