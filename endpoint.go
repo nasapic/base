@@ -6,6 +6,7 @@ import (
 
 type (
 	Endpoint struct {
+		Worker
 		name    string
 		service Service
 	}
@@ -41,9 +42,10 @@ const (
 	SessionKey = "session"
 )
 
-func NewEndpoint(name string) *Endpoint {
+func NewEndpoint(name string, log Logger) *Endpoint {
 	return &Endpoint{
-		name: name,
+		Worker: NewWorker(name, log),
+		name:   name,
 	}
 }
 

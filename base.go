@@ -14,6 +14,9 @@ type (
 		name     string
 		revision string
 
+		// Logging
+		log Logger
+
 		// Service
 		Service Service
 
@@ -26,16 +29,21 @@ type (
 	}
 )
 
-func NewApp(name string) *App {
+func NewApp(name string, log Logger) *App {
 	name = genName(name, "app")
 
 	return &App{
 		name: name,
+		log:  log,
 	}
 }
 
 func (app *App) Name() string {
 	return app.name
+}
+
+func (app *App) Log() Logger {
+	return app.log
 }
 
 func genName(name, defName string) string {
