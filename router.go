@@ -2,17 +2,44 @@ package base
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/gorilla/csrf"
+	"golang.org/x/time/rate"
 )
 
 type (
 	Router struct {
 		name string
 		chi.Router
+	}
+)
+
+type (
+	baseLimiter struct {
+		sync.Mutex
+		*rate.Limiter
+		last time.Time
+	}
+)
+
+var (
+	// TODO: Make configurable
+	// 30 requests per hour
+	hourLimiter = &baseLimiter{
+		Mutex:   sync.Mutex{},
+		Limiter: rate.NewLimiter(120, 1),
+		last:    time.Now(),
+	}
+
+	// 50 requests per hour
+	dayLimiter = &baseLimiter{
+		Mutex:   sync.Mutex{},
+		Limiter: rate.NewLimiter(1728, 1),
+		last:    time.Now(),
 	}
 )
 
@@ -30,6 +57,7 @@ func NewRouter(name string) *Router {
 	rt.Use(middleware.Timeout(60 * time.Second))
 	rt.Use(rt.MethodOverride)
 	rt.Use(rt.CSRFProtection)
+	rt.Use(rt.ThrottleLimit)
 
 	return &rt
 }
@@ -61,4 +89,26 @@ func (rt *Router) MethodOverride(next http.Handler) http.Handler {
 // CSRFProtection add cross-site request forgery protecction to the handler.
 func (rt *Router) CSRFProtection(next http.Handler) http.Handler {
 	return csrf.Protect([]byte("32-byte-long-auth-key"), csrf.Secure(false))(next)
+}
+
+// ThrottleLimit add rate limit protection
+func (rt *Router) ThrottleLimit(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		updateLimiter(hourLimiter)
+		updateLimiter(dayLimiter)
+
+		if !(hourLimiter.Allow() && dayLimiter.Allow()) {
+			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func updateLimiter(l *baseLimiter) {
+	l.Lock()
+	defer l.Unlock()
+
+	l.last = time.Now()
 }
