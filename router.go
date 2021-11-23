@@ -27,19 +27,18 @@ type (
 )
 
 var (
-	// FIX: Make configurable
-	hourRate = rate.Every(1 * time.Hour / 30)
-	dayRate  = rate.Every(24 * time.Hour / 50)
-
-	hourLimiter = baseLimiter{
+	// TODO: Make configurable
+	// 30 requests per hour
+	hourLimiter = &baseLimiter{
 		Mutex:   sync.Mutex{},
-		Limiter: rate.NewLimiter(hourRate, 1),
+		Limiter: rate.NewLimiter(120, 1),
 		last:    time.Now(),
 	}
 
-	dayLimiter = baseLimiter{
+	// 50 requests per hour
+	dayLimiter = &baseLimiter{
 		Mutex:   sync.Mutex{},
-		Limiter: rate.NewLimiter(dayRate, 1),
+		Limiter: rate.NewLimiter(1728, 1),
 		last:    time.Now(),
 	}
 )
@@ -95,10 +94,10 @@ func (rt *Router) CSRFProtection(next http.Handler) http.Handler {
 // ThrottleLimit add rate limit protection
 func (rt *Router) ThrottleLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		updateLimiter(&hourLimiter)
-		updateLimiter(&dayLimiter)
+		updateLimiter(hourLimiter)
+		updateLimiter(dayLimiter)
 
-		if !hourLimiter.Allow() || !dayLimiter.Allow() {
+		if !(hourLimiter.Allow() && dayLimiter.Allow()) {
 			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 			return
 		}
