@@ -15,6 +15,16 @@ type (
 	Router struct {
 		name string
 		chi.Router
+
+		// Hourly rate
+		maxReqPerHour uint64
+		hourlyRate    int
+		hourlyLimiter *baseLimiter
+
+		// Daily
+		maxReqPerDay uint64
+		dailyRate    int
+		dailyLimiter *baseLimiter
 	}
 )
 
@@ -26,21 +36,12 @@ type (
 	}
 )
 
-var (
-	// TODO: Make configurable
-	// 30 requests per hour
-	hourLimiter = &baseLimiter{
-		Mutex:   sync.Mutex{},
-		Limiter: rate.NewLimiter(120, 1),
-		last:    time.Now(),
-	}
-
-	// 50 requests per hour
-	dayLimiter = &baseLimiter{
-		Mutex:   sync.Mutex{},
-		Limiter: rate.NewLimiter(1728, 1),
-		last:    time.Now(),
-	}
+const (
+	hourInSecs = 3600
+	dayInSecs  = hourInSecs * 24
+	zeroInt    = 0
+	zeroInt64  = uint64(zeroInt)
+	maxInt64   = uint64(1<<64 - 1)
 )
 
 func NewRouter(name string) *Router {
@@ -49,6 +50,24 @@ func NewRouter(name string) *Router {
 	rt := Router{
 		name:   name,
 		Router: chi.NewRouter(),
+
+		// Hourly
+		maxReqPerHour: maxInt64,
+		hourlyRate:    0,
+		hourlyLimiter: &baseLimiter{
+			Mutex:   sync.Mutex{},
+			Limiter: rate.NewLimiter(zeroInt, 1), // i.e.: 120 = 30 reqs / hour
+			last:    time.Now(),
+		},
+
+		// Daily
+		maxReqPerDay: maxInt64,
+		dailyRate:    0,
+		dailyLimiter: &baseLimiter{
+			Mutex:   sync.Mutex{},
+			Limiter: rate.NewLimiter(zeroInt, 1), // i.e.: 1728 = 50 reqs / day
+			last:    time.Now(),
+		},
 	}
 
 	rt.Use(middleware.RequestID)
@@ -64,6 +83,22 @@ func NewRouter(name string) *Router {
 
 func (r *Router) Name() string {
 	return r.name
+}
+
+func (r *Router) SetHourlyRate(maxReqsPerHour int) {
+	if maxReqsPerHour <= 0 {
+		r.hourlyRate = 0
+	}
+
+	r.hourlyRate = hourInSecs / maxReqsPerHour
+}
+
+func (r *Router) SetDailyRate(maxReqsPerDay int) {
+	if maxReqsPerDay <= 0 {
+		r.dailyRate = 0
+	}
+
+	r.dailyRate = dayInSecs / maxReqsPerDay
 }
 
 // Middlewares
@@ -94,10 +129,10 @@ func (rt *Router) CSRFProtection(next http.Handler) http.Handler {
 // ThrottleLimit add rate limit protection
 func (rt *Router) ThrottleLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		updateLimiter(hourLimiter)
-		updateLimiter(dayLimiter)
+		updateLimiter(rt.hourlyLimiter)
+		updateLimiter(rt.dailyLimiter)
 
-		if !(hourLimiter.Allow() && dayLimiter.Allow()) {
+		if !(rt.hourlyLimiter.Allow() && rt.dailyLimiter.Allow()) {
 			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 			return
 		}
