@@ -1,4 +1,4 @@
-module gitlab.com/nasapic/base
+module gitlab.com/QWRyaWFuIEdvR29BcHBzIE5BU0E/base
 
 go 1.16
 
