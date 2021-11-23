@@ -17,14 +17,17 @@ type (
 		name string
 		chi.Router
 
+		// NOTE: Move responsability from router
+		// to the limiters themselves.
+
 		// Hourly rate
 		maxReqPerHour uint64
-		hourlyRate    int
+		hourlyRate    rate.Limit
 		hourlyLimiter *baseLimiter
 
 		// Daily
 		maxReqPerDay int
-		dailyRate    int
+		dailyRate    rate.Limit
 		dailyLimiter *baseLimiter
 	}
 )
@@ -56,7 +59,7 @@ func NewRouter(name string) *Router {
 		hourlyRate:    0,
 		hourlyLimiter: &baseLimiter{
 			Mutex:   sync.Mutex{},
-			Limiter: rate.NewLimiter(zeroInt, 1), // i.e.: 120 = 30 reqs / hour
+			Limiter: rate.NewLimiter(maxInt, 1), // i.e.: 120 = 30 reqs / hour
 			last:    time.Now(),
 		},
 
@@ -65,7 +68,7 @@ func NewRouter(name string) *Router {
 		dailyRate:    0,
 		dailyLimiter: &baseLimiter{
 			Mutex:   sync.Mutex{},
-			Limiter: rate.NewLimiter(zeroInt, 1), // i.e.: 1728 = 50 reqs / day
+			Limiter: rate.NewLimiter(maxInt, 1), // i.e.: 1728 = 50 reqs / day
 			last:    time.Now(),
 		},
 	}
@@ -90,7 +93,15 @@ func (r *Router) SetHourlyRate(maxReqsPerHour int) {
 		r.hourlyRate = 0
 	}
 
-	r.hourlyRate = hourInSecs / maxReqsPerHour
+	hr := float64(hourInSecs / maxReqsPerHour)
+
+	r.hourlyRate = rate.Limit(hr)
+
+	r.dailyLimiter = &baseLimiter{
+		Mutex:   sync.Mutex{},
+		Limiter: rate.NewLimiter(r.hourlyRate, 1), // i.e.: 1728 = 50 reqs / day
+		last:    time.Now(),
+	}
 }
 
 func (r *Router) SetDailyRate(maxReqsPerDay int) {
@@ -98,7 +109,15 @@ func (r *Router) SetDailyRate(maxReqsPerDay int) {
 		r.dailyRate = 0
 	}
 
-	r.dailyRate = dayInSecs / maxReqsPerDay
+	dr := float64(dayInSecs / maxReqsPerDay)
+
+	r.dailyRate = rate.Limit(dr)
+
+	r.dailyLimiter = &baseLimiter{
+		Mutex:   sync.Mutex{},
+		Limiter: rate.NewLimiter(r.dailyRate, 1), // i.e.: 1728 = 50 reqs / day
+		last:    time.Now(),
+	}
 }
 
 // Middlewares
