@@ -1,6 +1,7 @@
 package base
 
 import (
+	"math"
 	"net/http"
 	"sync"
 	"time"
@@ -22,7 +23,7 @@ type (
 		hourlyLimiter *baseLimiter
 
 		// Daily
-		maxReqPerDay uint64
+		maxReqPerDay int
 		dailyRate    int
 		dailyLimiter *baseLimiter
 	}
@@ -40,8 +41,7 @@ const (
 	hourInSecs = 3600
 	dayInSecs  = hourInSecs * 24
 	zeroInt    = 0
-	zeroInt64  = uint64(zeroInt)
-	maxInt64   = uint64(1<<64 - 1)
+	maxInt     = math.MaxInt64
 )
 
 func NewRouter(name string) *Router {
@@ -52,7 +52,7 @@ func NewRouter(name string) *Router {
 		Router: chi.NewRouter(),
 
 		// Hourly
-		maxReqPerHour: maxInt64,
+		maxReqPerHour: maxInt,
 		hourlyRate:    0,
 		hourlyLimiter: &baseLimiter{
 			Mutex:   sync.Mutex{},
@@ -61,7 +61,7 @@ func NewRouter(name string) *Router {
 		},
 
 		// Daily
-		maxReqPerDay: maxInt64,
+		maxReqPerDay: maxInt,
 		dailyRate:    0,
 		dailyLimiter: &baseLimiter{
 			Mutex:   sync.Mutex{},
