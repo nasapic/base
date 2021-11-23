@@ -12,18 +12,18 @@ import (
 	"time"
 )
 
-type logLevel = int
-type logOutput = int
+type logLevel = string
+type logOutput = string
 
 type (
 	// Logger is a simple interface that loggers supplied as dependencies
 	// to services and workers should implement.
 	Logger interface {
 		// Enabled informs whether the logger is enabled for this level.
-		Enabled(level int) bool
+		Enabled(level string) bool
 
 		// SetLevel sets logger log level
-		SetLevel(level int)
+		SetLevel(level string)
 
 		// Logs a debug message with the given key/values.
 		Debug(msg string, keysAndValues ...interface{})
@@ -56,10 +56,10 @@ type (
 	// on Go's standard logger provided for the sake of simplicity.
 	// A custom implementation can be provided if needed.
 	StdLogger struct {
-		level     int
+		level     string
 		prefix    string
 		valuesStr string
-		output    int
+		output    string
 		logger    *log.Logger
 	}
 )
@@ -78,35 +78,40 @@ const (
 
 // LogLevel valid values
 var LogLevel = &LogLevels{
-	None:  0,
-	Debug: 1,
-	Info:  2,
-	Error: 3,
-	All:   4,
+	None:  "none",
+	Debug: "debug",
+	Info:  "info",
+	Error: "error",
+	All:   "all",
 }
 
 var LogOutput = &LogOutputs{
-	KeyValue: 1,
-	JSON:     2,
+	KeyValue: "keyvalue",
+	JSON:     "json",
 }
 
 // New returns base logger implemented using Go's standard log package,
 // Example: base.New(log.LstdFlags)
-func NewStdLogger(level int, prefix string, output int, flags int) StdLogger {
-	return StdLogger{
+func NewLogger(level, prefix, output string, flags ...int) *StdLogger {
+	flag := 0
+	if len(flags) > 0 {
+		flag = flags[0]
+	}
+
+	return &StdLogger{
 		level:     level,
 		prefix:    prefix,
 		valuesStr: "",
 		output:    output,
-		logger:    log.New(os.Stdout, "", flags),
+		logger:    log.New(os.Stdout, "", flag),
 	}
 }
 
-func (sl *StdLogger) Enabled(level int) bool {
-	return sl.level >= level
+func (sl *StdLogger) Enabled(level string) bool {
+	return sl.level == level
 }
 
-func (sl *StdLogger) SetLevel(level int) {
+func (sl *StdLogger) SetLevel(level string) {
 	sl.level = level
 }
 
@@ -154,6 +159,7 @@ func (sl *StdLogger) FormatDebug(msg string, kvList []interface{}) (prefix, args
 	}
 
 	args = append(args, "ts", time.Now().Format(timestampFmt))
+	args = append(args, "msg", msg)
 
 	return prefix, sl.render(args, kvList)
 }
@@ -170,6 +176,7 @@ func (sl *StdLogger) FormatInfo(msg string, kvList []interface{}) (prefix, argsS
 	}
 
 	args = append(args, "ts", time.Now().Format(timestampFmt))
+	args = append(args, "msg", msg)
 
 	return prefix, sl.render(args, kvList)
 }
@@ -545,5 +552,5 @@ func (sl *StdLogger) escape(str string) bool {
 }
 
 func (sl *StdLogger) jsonOutput() bool {
-	return sl.jsonOutput()
+	return sl.level == LogOutput.JSON
 }
